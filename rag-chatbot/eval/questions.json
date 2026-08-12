@@ -1,0 +1,12 @@
+[
+  {
+    "question": "Tài liệu này nói về chủ đề gì?",
+    "expected_source": "",
+    "expected_keywords": []
+  },
+  {
+    "question": "Ví dụ câu hỏi có đáp án nằm trong một tài liệu cụ thể — sửa lại theo tài liệu thật của bạn.",
+    "expected_source": "ten-file-cua-ban.pdf",
+    "expected_keywords": ["tu_khoa_1", "tu_khoa_2"]
+  }
+]

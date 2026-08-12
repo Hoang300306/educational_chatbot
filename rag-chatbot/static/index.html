@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trợ Lý Tài Liệu — RAG Chatbot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232C3B64'/%3E%3Ctext x='50' y='68' font-size='55' text-anchor='middle' fill='%23E2A63D' font-family='Georgia,serif'%3E%C2%A7%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #EEF1EC;
+    --surface: #FFFFFF;
+    --ink: #172033;
+    --primary: #2C3B64;
+    --primary-dark: #1D2947;
+    --accent: #E2A63D;
+    --accent-soft: #FBEBCB;
+    --line: #D7DBD2;
+    --muted: #5C6470;
+    --danger: #B3452C;
+    --radius: 10px;
+    --font-display: 'Manrope', -apple-system, sans-serif;
+    --font-serif: 'Source Serif 4', Georgia, serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+  }
+  button:focus-visible, input:focus-visible, .upload-drop:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  .app { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ---- Topbar ---- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 24px; padding: 16px 28px;
+    background: var(--primary); color: #F4F5F0;
+    border-bottom: 3px solid var(--accent);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark {
+    width: 38px; height: 38px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: var(--accent); color: var(--primary-dark);
+    font-family: var(--font-serif); font-weight: 600; font-size: 20px;
+    border-radius: 8px;
+  }
+  .brand-name { font-weight: 700; font-size: 17px; letter-spacing: 0.01em; }
+  .brand-sub { font-size: 12.5px; opacity: 0.75; margin-top: 2px; }
+
+  .key-field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .key-field label { font-family: var(--font-mono); opacity: 0.8; }
+  .key-field input {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.28);
+    color: #fff; padding: 7px 10px; border-radius: 6px;
+    font-family: var(--font-mono); font-size: 12.5px; width: 170px;
+  }
+  .key-field input::placeholder { color: rgba(255,255,255,0.5); }
+  .key-status {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 3px 8px; border-radius: 20px; background: rgba(255,255,255,0.12);
+  }
+  .key-status.is-set { background: var(--accent); color: var(--primary-dark); font-weight: 700; }
+
+  /* ---- Layout ---- */
+  .layout { flex: 1; display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+
+  /* ---- Sidebar ---- */
+  .sidebar { border-right: 1px solid var(--line); padding: 22px 18px; background: var(--surface); overflow-y: auto; }
+  .panel-title {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 0 0 12px; font-weight: 700;
+  }
+  .upload-drop {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    border: 1.5px dashed var(--line); border-radius: var(--radius);
+    padding: 22px 12px; text-align: center; font-size: 13px; color: var(--muted);
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .upload-drop:hover, .upload-drop.is-dragover { border-color: var(--primary); background: #F5F7F3; }
+  .upload-icon {
+    font-size: 16px; width: 30px; height: 30px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--accent-soft); color: var(--primary-dark);
+  }
+  .upload-status { font-size: 12px; margin-top: 10px; min-height: 16px; line-height: 1.4; }
+  .upload-status.is-busy { color: var(--muted); }
+  .upload-status.is-success { color: #2E7D4F; }
+  .upload-status.is-error { color: var(--danger); }
+
+  .doc-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .doc-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 10px; border-radius: 7px; background: var(--bg); }
+  .doc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .doc-name { word-break: break-all; }
+  .doc-empty { font-size: 12.5px; color: var(--muted); padding: 6px 2px; }
+
+  /* ---- Chat ---- */
+  .chat { display: flex; flex-direction: column; min-height: 0; }
+  .thread { flex: 1; overflow-y: auto; padding: 26px 32px; display: flex; flex-direction: column; gap: 18px; }
+  .empty-state { margin: auto; max-width: 380px; text-align: center; color: var(--muted); font-family: var(--font-serif); font-size: 15px; line-height: 1.6; }
+
+  .msg { display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
+  .msg-user { align-self: flex-end; align-items: flex-end; }
+  .msg-bot { align-self: flex-start; align-items: flex-start; }
+
+  .bubble { padding: 12px 16px; border-radius: 14px; font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
+  .msg-user .bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .msg-bot .bubble { background: var(--surface); border: 1px solid var(--line); font-family: var(--font-serif); border-bottom-left-radius: 4px; }
+  .msg-error .bubble { border-color: var(--danger); color: var(--danger); font-family: var(--font-display); }
+
+  .cite-tag {
+    font-family: var(--font-mono); background: var(--accent-soft); color: var(--primary-dark);
+    padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 700; margin: 0 1px;
+  }
+
+  .typing { display: flex; gap: 4px; padding: 6px 4px; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  /* ---- Citation cards: the signature element (index-card / ticket-stub) ---- */
+  .cite-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+  .cite-card {
+    width: 220px; background: #FBFAF6; border: 1px solid var(--line);
+    border-left: 3px dashed var(--accent); border-radius: 4px; padding: 10px 12px;
+  }
+  .cite-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .cite-num {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    background: var(--primary); color: #fff; width: 16px; height: 16px;
+    border-radius: 3px; display: grid; place-items: center; flex-shrink: 0;
+  }
+  .cite-source { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cite-score { font-family: var(--font-mono); font-size: 10px; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+  .cite-excerpt { font-family: var(--font-serif); font-size: 12.5px; line-height: 1.5; color: var(--ink); margin: 0; }
+
+  /* ---- Ask bar ---- */
+  .ask-bar { display: flex; gap: 10px; padding: 16px 32px 22px; border-top: 1px solid var(--line); background: var(--surface); }
+  .ask-bar input {
+    flex: 1; padding: 12px 16px; border: 1px solid var(--line); border-radius: 24px;
+    font-family: var(--font-display); font-size: 14px; background: var(--bg);
+  }
+  .ask-bar button {
+    padding: 0 22px; border: none; border-radius: 24px; background: var(--primary); color: #fff;
+    font-family: var(--font-display); font-weight: 700; font-size: 14px; cursor: pointer; transition: background .15s;
+  }
+  .ask-bar button:hover { background: var(--primary-dark); }
+  .ask-bar button:disabled { opacity: .5; cursor: not-allowed; }
+
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--line); max-height: 220px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .key-field input { width: 140px; }
+    .thread { padding: 20px; }
+    .ask-bar { padding: 14px 20px 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .typing span { animation: none; opacity: .6; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">§</span>
+        <div>
+          <div class="brand-name">Trợ Lý Tài Liệu</div>
+          <div class="brand-sub">RAG chatbot đơn giản — hỏi đáp trên PDF / DOCX của bạn</div>
+        </div>
+      </div>
+      <div class="key-field">
+        <label for="apiKey">X-API-Key</label>
+        <input id="apiKey" type="password" placeholder="dán key của server..." />
+        <span id="keyStatus" class="key-status">chưa nhập</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <h2 class="panel-title">Tài liệu</h2>
+        <label class="upload-drop" id="dropZone" tabindex="0">
+          <input type="file" id="fileInput" accept=".pdf,.docx" hidden />
+          <span class="upload-icon">⇧</span>
+          <span>Kéo & thả hoặc bấm để tải PDF / DOCX</span>
+        </label>
+        <div id="uploadStatus" class="upload-status"></div>
+        <ul id="docList" class="doc-list"><li class="doc-empty">Chưa có tài liệu nào</li></ul>
+      </aside>
+
+      <main class="chat">
+        <div id="thread" class="thread">
+          <div class="empty-state">
+            <p>Nhập X-API-Key ở góc trên, tải lên một tài liệu PDF hoặc DOCX ở bên trái, rồi đặt câu hỏi tại đây. Mỗi câu trả lời sẽ luôn đi kèm trích dẫn nguồn.</p>
+          </div>
+        </div>
+        <form id="askForm" class="ask-bar">
+          <input id="questionInput" type="text" placeholder="Đặt câu hỏi về tài liệu của bạn..." autocomplete="off" />
+          <button type="submit" id="askButton">Gửi</button>
+        </form>
+      </main>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = '';
+  const $ = (id) => document.getElementById(id);
+  const apiKeyInput = $('apiKey'), keyStatus = $('keyStatus');
+  const dropZone = $('dropZone'), fileInput = $('fileInput'), uploadStatus = $('uploadStatus'), docList = $('docList');
+  const thread = $('thread'), askForm = $('askForm'), questionInput = $('questionInput'), askButton = $('askButton');
+
+  // ---- API key persistence (plain browser localStorage — this file is served
+  // by your own FastAPI app, not a Claude artifact, so this is safe to use) ----
+  apiKeyInput.value = localStorage.getItem('rag_api_key') || '';
+  updateKeyStatus();
+  apiKeyInput.addEventListener('input', () => {
+    localStorage.setItem('rag_api_key', apiKeyInput.value);
+    updateKeyStatus();
+  });
+  function updateKeyStatus() {
+    const set = !!apiKeyInput.value;
+    keyStatus.textContent = set ? 'đã lưu' : 'chưa nhập';
+    keyStatus.classList.toggle('is-set', set);
+  }
+  function authHeaders(extra) { return Object.assign({ 'X-API-Key': apiKeyInput.value }, extra || {}); }
+
+  // ---- Documents ----
+  async function refreshDocuments() {
+    try {
+      const res = await fetch(API_BASE + '/api/documents', { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      docList.innerHTML = '';
+      if (!data.documents.length) {
+        docList.innerHTML = '<li class="doc-empty">Chưa có tài liệu nào</li>';
+        return;
+      }
+      data.documents.forEach((name) => {
+        const li = document.createElement('li');
+        li.className = 'doc-item';
+        li.innerHTML = '<span class="doc-dot"></span><span class="doc-name"></span>';
+        li.querySelector('.doc-name').textContent = name;
+        docList.appendChild(li);
+      });
+    } catch (e) { /* sidebar just stays as-is until the key/server is fixed */ }
+  }
+
+  // ---- Upload ----
+  ['dragover', 'dragleave', 'drop'].forEach((evt) => {
+    dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropZone.classList.toggle('is-dragover', evt === 'dragover');
+    });
+  });
+  dropZone.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
+  dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+  async function uploadFile(file) {
+    uploadStatus.textContent = 'Đang xử lý "' + file.name + '"...';
+    uploadStatus.className = 'upload-status is-busy';
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch(API_BASE + '/api/upload', { method: 'POST', headers: authHeaders(), body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Tải lên thất bại');
+      uploadStatus.textContent = 'Đã thêm "' + data.filename + '" (' + data.chunks_added + ' đoạn)';
+      uploadStatus.className = 'upload-status is-success';
+      refreshDocuments();
+    } catch (e) {
+      uploadStatus.textContent = e.message;
+      uploadStatus.className = 'upload-status is-error';
+    }
+    fileInput.value = '';
+  }
+
+  // ---- Chat ----
+  askForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const question = questionInput.value.trim();
+    if (!question) return;
+    clearEmptyState();
+    addMessage('user', question);
+    questionInput.value = '';
+    askButton.disabled = true;
+    const typingEl = addTyping();
+
+    try {
+      const res = await fetch(API_BASE + '/api/ask', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      typingEl.remove();
+      if (!res.ok) throw new Error(data.detail || 'Có lỗi xảy ra');
+      addMessage('bot', data.answer, data.citations);
+    } catch (err) {
+      typingEl.remove();
+      addMessage('bot', '⚠ ' + err.message, [], true);
+    } finally {
+      askButton.disabled = false;
+      questionInput.focus();
+    }
+  });
+
+  function clearEmptyState() {
+    const empty = thread.querySelector('.empty-state');
+    if (empty) empty.remove();
+  }
+
+  function addMessage(role, text, citations, isError) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg msg-' + role + (isError ? ' msg-error' : '');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    renderWithCiteTags(bubble, text);
+    wrap.appendChild(bubble);
+
+    if (citations && citations.length) {
+      const cards = document.createElement('div');
+      cards.className = 'cite-cards';
+      citations.forEach((c) => cards.appendChild(buildCiteCard(c)));
+      wrap.appendChild(cards);
+    }
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+    return wrap;
+  }
+
+  // Renders bot text while turning "[1]" "[2]" markers into styled superscript tags,
+  // without ever using innerHTML on untrusted content.
+  function renderWithCiteTags(container, text) {
+    const parts = text.split(/(\[\d+\])/g);
+    parts.forEach((part) => {
+      const m = part.match(/^\[(\d+)\]$/);
+      if (m) {
+        const sup = document.createElement('sup');
+        sup.className = 'cite-tag';
+        sup.textContent = m[1];
+        container.appendChild(sup);
+      } else if (part) {
+        container.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+
+  function buildCiteCard(c) {
+    const card = document.createElement('div');
+    card.className = 'cite-card';
+
+    const head = document.createElement('div');
+    head.className = 'cite-card-head';
+    const num = document.createElement('span'); num.className = 'cite-num'; num.textContent = c.index;
+    const src = document.createElement('span'); src.className = 'cite-source';
+    src.textContent = c.source + (c.page ? ' · tr. ' + c.page : '');
+    const score = document.createElement('span'); score.className = 'cite-score';
+    score.textContent = Math.round(c.score * 100) + '%';
+    head.append(num, src, score);
+
+    const excerpt = document.createElement('p');
+    excerpt.className = 'cite-excerpt';
+    excerpt.textContent = c.excerpt + '…';
+
+    card.append(head, excerpt);
+    return card;
+  }
+
+  function addTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg msg-bot';
+    wrap.innerHTML = '<div class="bubble typing"><span></span><span></span><span></span></div>';
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+    return wrap;
+  }
+
+  refreshDocuments();
+</script>
+</body>
+</html>
