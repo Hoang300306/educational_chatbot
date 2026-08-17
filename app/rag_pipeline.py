@@ -103,6 +103,20 @@ class RAGPipeline:
     def list_documents(self) -> List[str]:
         return self.store.list_sources()
 
+    def remove_document(self, source: str) -> int:
+        """Remove a document's chunks from the vector store, delete its file
+        from disk, and clear the answer cache (a cached answer may have been
+        grounded in the chunks we just removed). Returns chunks removed."""
+        removed = self.store.remove_source(source)
+        if removed:
+            self.store.save(self.store_dir)
+            answer_cache.clear()
+
+            uploaded_file = Path(settings.upload_dir) / source
+            if uploaded_file.exists() and uploaded_file.is_file():
+                uploaded_file.unlink()
+        return removed
+
     @property
     def num_chunks(self) -> int:
         return self.store.num_chunks

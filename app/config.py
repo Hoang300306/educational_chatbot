@@ -15,11 +15,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---- LLM (Milestone 5) ----
-    llm_provider: str = "anthropic"  # "openai" or "anthropic"
+    llm_provider: str = "anthropic"  # "openai", "anthropic", or "gemini"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash"
 
     # ---- Embeddings (Milestone 2) ----
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"

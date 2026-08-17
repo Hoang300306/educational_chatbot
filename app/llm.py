@@ -2,8 +2,9 @@
 Milestone 5 — LLM
 Question + Retrieved Context  ->  LLM  ->  Answer
 
-Supports OpenAI and Anthropic, selected via LLM_PROVIDER in .env, so you
-only need to install/configure the provider you actually want to use.
+Supports OpenAI, Anthropic, and Gemini, selected via LLM_PROVIDER in
+.env, so you only need to install/configure the provider you actually
+want to use.
 """
 from __future__ import annotations
 
@@ -78,6 +79,23 @@ def _call_anthropic(user_prompt: str) -> str:
     return "".join(block.text for block in response.content if block.type == "text")
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
+def _call_gemini(user_prompt: str) -> str:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=settings.gemini_api_key)
+    response = client.models.generate_content(
+        model=settings.gemini_model,
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.2,
+        ),
+    )
+    return response.text or ""
+
+
 def generate_answer(question: str, chunks: List[RetrievedChunk]) -> str:
     """Milestone 5 entry point: question + retrieved chunks -> answer string."""
     user_prompt = build_user_prompt(question, chunks)
@@ -91,8 +109,12 @@ def generate_answer(question: str, chunks: List[RetrievedChunk]) -> str:
         if not settings.anthropic_api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set — add it to your .env file")
         answer = _call_anthropic(user_prompt)
+    elif provider == "gemini":
+        if not settings.gemini_api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set — add it to your .env file")
+        answer = _call_gemini(user_prompt)
     else:
-        raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use 'openai' or 'anthropic'.")
+        raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use 'openai', 'anthropic', or 'gemini'.")
 
     logger.info(f"Generated answer ({len(answer)} chars) using provider='{provider}'")
     return answer

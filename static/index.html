@@ -59,7 +59,7 @@
   .brand-name { font-weight: 700; font-size: 17px; letter-spacing: 0.01em; }
   .brand-sub { font-size: 12.5px; opacity: 0.75; margin-top: 2px; }
 
-  .key-field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .key-field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; row-gap: 10px; }
   .key-field label { font-family: var(--font-mono); opacity: 0.8; }
   .key-field input {
     background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.28);
@@ -72,6 +72,21 @@
     padding: 3px 8px; border-radius: 20px; background: rgba(255,255,255,0.12);
   }
   .key-status.is-set { background: var(--accent); color: var(--primary-dark); font-weight: 700; }
+
+  .toggle-field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .toggle-switch { position: relative; width: 34px; height: 19px; flex-shrink: 0; }
+  .toggle-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.25); border-radius: 20px; transition: background .15s; pointer-events: none; }
+  .toggle-slider::before {
+    content: ""; position: absolute; width: 15px; height: 15px; left: 2px; top: 2px;
+    background: #fff; border-radius: 50%; transition: transform .15s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(15px); background: var(--primary-dark); }
+  .toggle-switch input:focus-visible + .toggle-slider { outline: 2px solid #fff; outline-offset: 2px; }
+
+  /* citations hidden globally while the toggle is off */
+  body.hide-citations .cite-cards { display: none; }
 
   /* ---- Layout ---- */
   .layout { flex: 1; display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
@@ -99,10 +114,17 @@
   .upload-status.is-error { color: var(--danger); }
 
   .doc-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .doc-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 10px; border-radius: 7px; background: var(--bg); }
+  .doc-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 6px 8px 10px; border-radius: 7px; background: var(--bg); }
   .doc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-  .doc-name { word-break: break-all; }
+  .doc-name { word-break: break-all; flex: 1; }
   .doc-empty { font-size: 12.5px; color: var(--muted); padding: 6px 2px; }
+  .doc-delete {
+    flex-shrink: 0; width: 20px; height: 20px; border: none; border-radius: 5px;
+    background: transparent; color: var(--muted); cursor: pointer; font-size: 13px;
+    display: grid; place-items: center; transition: background .15s, color .15s;
+  }
+  .doc-delete:hover { background: var(--danger); color: #fff; }
+  .doc-item.is-deleting { opacity: .45; pointer-events: none; }
 
   /* ---- Chat ---- */
   .chat { display: flex; flex-direction: column; min-height: 0; }
@@ -182,6 +204,13 @@
         </div>
       </div>
       <div class="key-field">
+        <label class="toggle-field">
+          <span class="toggle-switch">
+            <input type="checkbox" id="showCitations" checked />
+            <span class="toggle-slider"></span>
+          </span>
+          Hiện trích dẫn
+        </label>
         <label for="apiKey">X-API-Key</label>
         <input id="apiKey" type="password" placeholder="dán key của server..." />
         <span id="keyStatus" class="key-status">chưa nhập</span>
@@ -217,7 +246,7 @@
 <script>
   const API_BASE = '';
   const $ = (id) => document.getElementById(id);
-  const apiKeyInput = $('apiKey'), keyStatus = $('keyStatus');
+  const apiKeyInput = $('apiKey'), keyStatus = $('keyStatus'), showCitationsToggle = $('showCitations');
   const dropZone = $('dropZone'), fileInput = $('fileInput'), uploadStatus = $('uploadStatus'), docList = $('docList');
   const thread = $('thread'), askForm = $('askForm'), questionInput = $('questionInput'), askButton = $('askButton');
 
@@ -236,6 +265,17 @@
   }
   function authHeaders(extra) { return Object.assign({ 'X-API-Key': apiKeyInput.value }, extra || {}); }
 
+  // ---- Citation visibility toggle (persisted, applies to all messages) ----
+  showCitationsToggle.checked = localStorage.getItem('rag_show_citations') !== 'off';
+  applyCitationVisibility();
+  showCitationsToggle.addEventListener('change', () => {
+    localStorage.setItem('rag_show_citations', showCitationsToggle.checked ? 'on' : 'off');
+    applyCitationVisibility();
+  });
+  function applyCitationVisibility() {
+    document.body.classList.toggle('hide-citations', !showCitationsToggle.checked);
+  }
+
   // ---- Documents ----
   async function refreshDocuments() {
     try {
@@ -247,14 +287,45 @@
         docList.innerHTML = '<li class="doc-empty">Chưa có tài liệu nào</li>';
         return;
       }
-      data.documents.forEach((name) => {
-        const li = document.createElement('li');
-        li.className = 'doc-item';
-        li.innerHTML = '<span class="doc-dot"></span><span class="doc-name"></span>';
-        li.querySelector('.doc-name').textContent = name;
-        docList.appendChild(li);
-      });
+      data.documents.forEach((name) => docList.appendChild(buildDocItem(name)));
     } catch (e) { /* sidebar just stays as-is until the key/server is fixed */ }
+  }
+
+  function buildDocItem(name) {
+    const li = document.createElement('li');
+    li.className = 'doc-item';
+
+    const dot = document.createElement('span'); dot.className = 'doc-dot';
+    const label = document.createElement('span'); label.className = 'doc-name'; label.textContent = name;
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'doc-delete';
+    del.title = 'Xoá tài liệu này';
+    del.setAttribute('aria-label', 'Xoá ' + name);
+    del.textContent = '✕';
+    del.addEventListener('click', () => deleteDocument(name, li));
+
+    li.append(dot, label, del);
+    return li;
+  }
+
+  async function deleteDocument(name, li) {
+    if (!confirm('Xoá "' + name + '" khỏi kho tài liệu? Thao tác này không thể hoàn tác.')) return;
+    li.classList.add('is-deleting');
+    try {
+      const res = await fetch(API_BASE + '/api/documents?source=' + encodeURIComponent(name), {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Xoá thất bại');
+      refreshDocuments();
+    } catch (e) {
+      li.classList.remove('is-deleting');
+      uploadStatus.textContent = e.message;
+      uploadStatus.className = 'upload-status is-error';
+    }
   }
 
   // ---- Upload ----

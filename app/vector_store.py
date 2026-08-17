@@ -56,6 +56,30 @@ class FaissVectorStore:
     def list_sources(self) -> List[str]:
         return sorted({c.source for c in self.metadata})
 
+    def remove_source(self, source: str) -> int:
+        """
+        Remove every chunk belonging to `source`. FAISS's flat index has no
+        native per-vector delete, so this reconstructs the surviving vectors
+        and rebuilds the index from scratch — perfectly fine at the scale a
+        "simple" tool like this runs at. Returns the number of chunks removed.
+        """
+        keep_mask = np.array([c.source != source for c in self.metadata], dtype=bool)
+        removed = int((~keep_mask).sum())
+        if removed == 0:
+            return 0
+
+        all_vectors = self.index.reconstruct_n(0, self.index.ntotal) if self.index.ntotal else np.zeros((0, self.dim), dtype="float32")
+        kept_chunks = [c for c, keep in zip(self.metadata, keep_mask) if keep]
+        kept_vectors = all_vectors[keep_mask]
+
+        self.index = faiss.IndexFlatIP(self.dim)
+        self.metadata = []
+        if kept_chunks:
+            self.add(kept_chunks, kept_vectors)
+
+        logger.info(f"Removed {removed} chunks for source '{source}' ({len(self.metadata)} remaining)")
+        return removed
+
     @property
     def num_chunks(self) -> int:
         return len(self.metadata)

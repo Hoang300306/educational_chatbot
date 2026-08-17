@@ -46,6 +46,16 @@ def test_upload_rejects_unsupported_extension():
     assert "pdf" in resp.json()["detail"].lower()
 
 
+def test_delete_document_requires_api_key():
+    resp = client.request("DELETE", "/api/documents?source=whatever.pdf")
+    assert resp.status_code == 401
+
+
+def test_delete_document_requires_source_param():
+    resp = client.request("DELETE", "/api/documents", headers={"X-API-Key": settings.app_api_key})
+    assert resp.status_code == 422  # missing required query param
+
+
 def test_upload_rejects_empty_file():
     resp = client.post(
         "/api/upload",
