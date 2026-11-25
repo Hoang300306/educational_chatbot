@@ -43,15 +43,15 @@ Cài các công cụ nền tảng (làm một lần trên máy bạn):
 
 ```bash
 # 1) Tạo và kích hoạt virtual environment
-python3 -m venv .venv
+python3 -m venv .venv             # Windows: python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 # 2) Cài dependencies (bản dev có thêm pytest/httpx để chạy test)
 pip install -r requirements-dev.txt
 
 # 3) Tạo file .env từ mẫu, rồi điền API key của bạn
-cp .env.example .env
-# Mở .env, điền OPENAI_API_KEY hoặc ANTHROPIC_API_KEY tuỳ theo LLM_PROVIDER
+cp .env.example .env             # Windows: copy .env.example .env
+# Mở .env, điền OPENAI_API_KEY, ANTHROPIC_API_KEY hoặc GEMINI_API_KEY tuỳ theo LLM_PROVIDER
 # Đổi luôn APP_API_KEY thành một chuỗi bí mật của riêng bạn
 
 # 4) Chạy server
@@ -140,7 +140,7 @@ rag-chatbot/
 
 `app/llm.py`
 
-- Hỗ trợ **cả OpenAI lẫn Anthropic**, chọn qua `LLM_PROVIDER` trong `.env`
+- Hỗ trợ **OpenAI, Anthropic và Google Gemini**, chọn qua `LLM_PROVIDER` trong `.env`
   — chỉ cần cấu hình API key của nhà cung cấp bạn dùng.
 - Prompt hệ thống yêu cầu mô hình **chỉ trả lời dựa trên context được cung
   cấp**, nói rõ khi không đủ thông tin thay vì bịa, và chú thích nguồn theo
@@ -171,6 +171,7 @@ FastAPI phục vụ cả API lẫn giao diện tĩnh:
 | POST   | `/api/upload`    | Tải PDF/DOCX, xử lý và thêm vào vector store         |
 | POST   | `/api/ask`       | Gửi câu hỏi, nhận `{answer, citations}`             |
 | GET    | `/api/documents` | Danh sách tài liệu đã nạp + tổng số chunk            |
+| DELETE | `/api/documents?source=<tên_file>` | Xoá tài liệu khỏi vector store, đĩa và làm mới cache |
 | GET    | `/`              | Giao diện chat (static/index.html)                  |
 
 Các endpoint `/api/*` yêu cầu header `X-API-Key` khớp với `APP_API_KEY`
@@ -256,8 +257,6 @@ chạy được cả trong môi trường CI không có Internet.
 - Chunking hiện dựa trên số ký tự + ranh giới câu/đoạn đơn giản; có thể
   thay bằng `RecursiveCharacterTextSplitter` của LangChain nếu cần tinh
   chỉnh sâu hơn.
-- Chưa có xoá/quản lý từng tài liệu riêng lẻ trong vector store (chỉ có
-  thêm) — có thể mở rộng bằng cách lưu thêm `doc_id` và lọc khi xoá.
 - Đánh giá (Milestone 8) hiện là rule-based (khớp từ khoá/nguồn); nếu cần
   đánh giá ngữ nghĩa sâu hơn, cân nhắc tích hợp RAGAS hoặc chấm điểm bằng
   chính LLM (LLM-as-judge).
