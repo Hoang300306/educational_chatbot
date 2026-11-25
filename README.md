@@ -1,22 +1,3 @@
-# Trợ Lý Tài Liệu — RAG Chatbot đơn giản
-
-Chatbot trả lời câu hỏi dựa trên tài liệu **PDF/DOCX** do bạn tải lên, dùng kiến
-trúc **RAG (Retrieval-Augmented Generation)**: tài liệu được cắt nhỏ, embed,
-lưu vào FAISS; khi hỏi, hệ thống tìm các đoạn liên quan nhất rồi đưa cho LLM
-để sinh câu trả lời **kèm trích dẫn nguồn**.
-
-Toàn bộ project bám sát 9 milestone (0 → 8) đã đề ra, mỗi milestone ứng với
-một hoặc vài file trong `app/`.
-
-```
-PDF/DOCX → Text → Chunks → Embedding → FAISS → Retrieval → LLM → Answer + Citation
-                                                                         ↑
-                                                          FastAPI + Frontend (Milestone 7)
-                                                          Docker/Log/Eval/Cache/Security (Milestone 8)
-```
-
----
-
 ## Mục lục
 
 - [Milestone 0 — Môi trường](#milestone-0--môi-trường)
